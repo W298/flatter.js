@@ -11,6 +11,10 @@ export class Vector {
     return new Vector(v.x + w.x, v.y + w.y);
   }
 
+  static Sub(v, w) {
+    return new Vector(v.x - w.x, v.y - w.y);
+  }
+
   static Mul(vector, scalar) {
     return new Vector(vector.x * scalar, vector.y * scalar);
   }
@@ -24,6 +28,10 @@ export class Vector {
 export class Angle {
   static Add(a, b) {
     return new Angle(a.degrees + b.degrees);
+  }
+
+  static Sub(a, b) {
+    return new Angle(a.degrees - b.degrees);
   }
 
   #degrees = 0;
@@ -44,6 +52,24 @@ export class RootObject {
     this.name = name;
     this.isActive = isActive;
   }
+}
+
+export class Camera extends RootObject {
+  static #current = null;
+  constructor({ position, rotation, distance, ...args }) {
+    super(args);
+    this.position = position;
+    this.rotation = rotation;
+    this.distance = distance;
+
+    if (!Camera.#current) Camera.#current = this;
+  }
+
+  get current() {
+    return this.#current ?? new Camera();
+  }
+
+  update() {}
 }
 
 export class SceneObject extends RootObject {
@@ -86,11 +112,11 @@ export class Component extends SceneObject {
 }
 
 export class Renderer extends Component {
-  constructor(args) {
+  constructor(args = {}) {
     super(args);
   }
 
-  get worldTransform() {
+  get renderTransform() {
     let root = this.gameObject;
 
     let position = this.transform.position;
@@ -108,6 +134,9 @@ export class Renderer extends Component {
       root = root.parent;
     }
 
+    Vector.Sub(position, Camera.current.position);
+    Vector.Mul(scale, Camera.current.distance);
+
     return new Transform({ position, rotation, scale });
   }
 
@@ -123,13 +152,13 @@ export class ShapeRenderer extends Renderer {
 }
 
 export class BoxRenderer extends ShapeRenderer {
-  constructor(args) {
+  constructor(args = {}) {
     super(args);
   }
 }
 
 export class CircleRenderer extends ShapeRenderer {
-  constructor(args) {
+  constructor(args = {}) {
     super(args);
   }
 }
@@ -161,13 +190,13 @@ export class Collider extends Component {
 }
 
 export class BoxCollider extends Collider {
-  constructor(args) {
+  constructor(args = {}) {
     super(args);
   }
 }
 
 export class CircleCollider extends Collider {
-  constructor(args) {
+  constructor(args = {}) {
     super(args);
   }
 }
