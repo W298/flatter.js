@@ -55,18 +55,19 @@ export class RootObject {
 }
 
 export class Camera extends RootObject {
-  static #current = null;
-  constructor({ position, rotation, distance, ...args }) {
+  static current = null;
+  constructor({
+    position = Vector.zero,
+    rotation = new Angle(),
+    distance = 1,
+    ...args
+  } = {}) {
     super(args);
     this.position = position;
     this.rotation = rotation;
     this.distance = distance;
 
-    if (!Camera.#current) Camera.#current = this;
-  }
-
-  get current() {
-    return this.#current ?? new Camera();
+    if (!Camera.current) Camera.current = this;
   }
 
   update() {}
@@ -134,20 +135,73 @@ export class Renderer extends Component {
       root = root.parent;
     }
 
-    Vector.Sub(position, Camera.current.position);
-    Vector.Mul(scale, Camera.current.distance);
+    position = Vector.Sub(position, Camera.current.position);
+    position = Vector.Add(
+      position,
+      new Vector(Core.canvas.width / 2, Core.canvas.height / 2)
+    );
+    scale = Vector.Mul(scale, Camera.current.distance);
 
     return new Transform({ position, rotation, scale });
   }
 
-  update() {}
   _draw() {}
+  _rotate() {}
+  update() {
+    super.update();
+
+    Core.ctx.beginPath();
+    this._rotate();
+    this._draw();
+    Core.ctx.closePath();
+    Core.ctx.setTransform(1, 0, 0, 1, 0, 0);
+  }
+}
+
+export class TextRenderer extends Renderer {
+  constructor({ text = "Example Text", style, ...args } = {}) {
+    super(args);
+    this.text = text;
+    this.style = {
+      fontFamily: "Consolas",
+      fontSize: 20,
+      color: "black",
+      align: {
+        horizontal: "center",
+        vertical: "middle",
+      },
+      ...style,
+    };
+  }
+
+  _draw() {
+    const { position, scale } = this.renderTransform;
+
+    Core.ctx.font = `${this.style.fontSize * scale.x}px ${
+      this.style.fontFamily
+    }`;
+    Core.ctx.fillStyle = this.style.color;
+    Core.ctx.textAlign = this.style.align.horizontal;
+    Core.ctx.textBaseline = this.style.align.vertical;
+    Core.ctx.fillText(this.text, position.x, position.y);
+  }
 }
 
 export class ShapeRenderer extends Renderer {
   constructor({ style, ...args }) {
     super(args);
-    this.style = style;
+    this.style = {
+      fill: {
+        enabled: true,
+        color: "black",
+      },
+      stroke: {
+        enabled: false,
+        color: "black",
+        weight: 1,
+      },
+      ...style,
+    };
   }
 }
 
@@ -155,11 +209,58 @@ export class BoxRenderer extends ShapeRenderer {
   constructor(args = {}) {
     super(args);
   }
+
+  _draw() {
+    const { position, scale } = this.renderTransform;
+
+    Core.ctx.rect(
+      position.x - scale.x / 2,
+      position.y - scale.y / 2,
+      scale.x,
+      scale.y
+    );
+
+    if (this.style.fill.enabled) {
+      Core.ctx.fillStyle = this.style.fill.color;
+      Core.ctx.fill();
+    }
+
+    if (this.style.stroke.enabled) {
+      Core.ctx.strokeStyle = this.style.stroke.color;
+      Core.ctx.lineWidth = this.style.stroke.weight;
+      Core.ctx.stroke();
+    }
+  }
 }
 
 export class CircleRenderer extends ShapeRenderer {
   constructor(args = {}) {
     super(args);
+  }
+
+  _draw() {
+    const { position, scale } = this.renderTransform;
+
+    Core.ctx.ellipse(
+      position.x,
+      position.y,
+      scale.x,
+      scale.y,
+      0,
+      0,
+      2 * Math.PI
+    );
+
+    if (this.style.fill.enabled) {
+      Core.ctx.fillStyle = this.style.fill.color;
+      Core.ctx.fill();
+    }
+
+    if (this.style.stroke.enabled) {
+      Core.ctx.strokeStyle = this.style.stroke.color;
+      Core.ctx.lineWidth = this.style.stroke.weight;
+      Core.ctx.stroke();
+    }
   }
 }
 
@@ -167,8 +268,24 @@ export class Sprite {
   constructor(src, w = 0, h = 0) {
     this.img = new Image();
     this.img.src = src;
-    this.img.width = w;
-    this.img.height = h;
+    if (w) this.width = w;
+    if (h) this.height = h;
+  }
+
+  get width() {
+    return this.img.width;
+  }
+
+  set width(newVal) {
+    this.img.width = newVal;
+  }
+
+  get height() {
+    return this.img.height;
+  }
+
+  set height(newVal) {
+    this.img.height = newVal;
   }
 }
 
@@ -178,7 +295,19 @@ export class SpriteRenderer extends Renderer {
     this.sprite = sprite;
   }
 
-  _draw() {}
+  _draw() {
+    const { position, scale } = this.renderTransform;
+    const width = this.sprite.img.width * scale.x;
+    const height = this.sprite.img.height * scale.y;
+
+    Core.ctx.drawImage(
+      this.sprite.img,
+      position.x - width / 2,
+      position.y - height / 2,
+      width,
+      height
+    );
+  }
 }
 
 export class Collider extends Component {
@@ -202,11 +331,17 @@ export class CircleCollider extends Collider {
 }
 
 export class GameObject extends SceneObject {
+  static #gameObjectList = [];
+  static Update() {
+    GameObject.#gameObjectList.forEach((g) => g.update());
+  }
+
   #componentList = [];
   constructor({ parent = null, children = [], ...args } = {}) {
     super(args);
     this.parent = parent;
     this.children = children;
+    GameObject.#gameObjectList.push(this);
   }
 
   setChild(gameObject) {
@@ -218,4 +353,34 @@ export class GameObject extends SceneObject {
     this.#componentList.push(component);
     component.gameObject = this;
   }
+
+  update() {
+    this.#componentList.forEach((c) => c.update());
+  }
 }
+
+export const Core = {
+  init(width = innerWidth, height = innerHeight) {
+    this.canvas = document.querySelector("canvas");
+    if (!this.canvas) {
+      this.canvas = document.createElement("canvas");
+      document.body.appendChild(this.canvas);
+    }
+
+    this.canvas.width = width;
+    this.canvas.height = height;
+    this.ctx = this.canvas.getContext("2d");
+
+    let mainCam = new Camera();
+    this.TICK = 0;
+
+    this.animate();
+  },
+  animate() {
+    requestAnimationFrame(() => {
+      this.animate();
+    });
+    GameObject.Update();
+    this.TICK++;
+  },
+};
