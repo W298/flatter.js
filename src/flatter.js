@@ -48,10 +48,20 @@ export class Angle {
 }
 
 export class RootObject {
+  static #rootObjectList = [];
+  static Update() {
+    RootObject.#rootObjectList.forEach((r) => {
+      if (!(r instanceof SceneObject)) r.update();
+    });
+    SceneObject.Update();
+  }
   constructor({ name = "", isActive = true } = {}) {
     this.name = name;
     this.isActive = isActive;
+    RootObject.#rootObjectList.push(this);
   }
+
+  update() {}
 }
 
 export class Camera extends RootObject {
@@ -69,19 +79,35 @@ export class Camera extends RootObject {
 
     if (!Camera.current) Camera.current = this;
   }
-
-  update() {}
 }
 
 export class SceneObject extends RootObject {
+  static #sceneObjectList = [];
+  static Update() {
+    SceneObject.#sceneObjectList.forEach((s) => s.update());
+  }
+
+  #layer = 0;
   constructor({ transform = new Transform(), layer = 0, ...args } = {}) {
     super(args);
     this.transform = transform;
     this.transform.gameObject = this;
     this.layer = layer;
+    SceneObject.#sceneObjectList.push(this);
   }
 
-  update() {}
+  get layer() {
+    return this.#layer;
+  }
+
+  set layer(newVal) {
+    this.#layer = newVal;
+    this.sortWithLayer();
+  }
+
+  sortWithLayer() {
+    SceneObject.#sceneObjectList.sort((a, b) => a.layer - b.layer);
+  }
 }
 
 export class Module extends RootObject {
@@ -332,10 +358,6 @@ export class CircleCollider extends Collider {
 
 export class GameObject extends SceneObject {
   static #gameObjectList = [];
-  static Update() {
-    GameObject.#gameObjectList.forEach((g) => g.update());
-  }
-
   #componentList = [];
   constructor({ parent = null, children = [], ...args } = {}) {
     super(args);
@@ -354,9 +376,7 @@ export class GameObject extends SceneObject {
     component.gameObject = this;
   }
 
-  update() {
-    this.#componentList.forEach((c) => c.update());
-  }
+  update() {}
 }
 
 export const Core = {
@@ -371,7 +391,7 @@ export const Core = {
     this.canvas.height = height;
     this.ctx = this.canvas.getContext("2d");
 
-    let mainCam = new Camera();
+    let mainCam = new Camera({ name: "MainCam" });
     this.TICK = 0;
 
     this.animate();
@@ -380,7 +400,7 @@ export const Core = {
     requestAnimationFrame(() => {
       this.animate();
     });
-    GameObject.Update();
+    RootObject.Update();
     this.TICK++;
   },
 };

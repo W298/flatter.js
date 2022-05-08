@@ -4,6 +4,7 @@ import {
   CircleRenderer,
   Core,
   GameObject,
+  SceneObject,
   Sprite,
   SpriteRenderer,
   TextRenderer,
@@ -45,3 +46,5 @@ g.attach(t);
 g.attach(s);
 
 Camera.current.distance = 1;
+
+t.layer = 1000;
