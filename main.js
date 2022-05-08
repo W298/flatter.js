@@ -1,4 +1,5 @@
 import {
+  Angle,
   BoxRenderer,
   Camera,
   CircleRenderer,
@@ -26,6 +27,7 @@ sp.width = 100;
 sp.height = 100;
 
 s.transform.scale = new Vector(0.5, 0.5);
+s.transform.rotation.degrees = 45;
 
 c.style.fill.color = "darkslateblue";
 c.transform.scale = new Vector(100, 100);
@@ -48,3 +50,15 @@ g.attach(s);
 Camera.current.distance = 1;
 
 t.layer = 1000;
+
+let g2 = new GameObject();
+let cc = new BoxRenderer();
+
+cc.style.fill.color = "cyan";
+cc.transform.position = new Vector(200, 100);
+cc.transform.scale = new Vector(200, 100);
+
+g2.attach(cc);
+
+Camera.current.position = new Vector(100, 100);
+Camera.current.rotation.degrees = 35;

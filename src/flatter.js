@@ -27,16 +27,20 @@ export class Vector {
 
 export class Angle {
   static Add(a, b) {
-    return new Angle(a.degrees + b.degrees);
+    return new Angle({ degrees: a.degrees + b.degrees });
   }
 
   static Sub(a, b) {
-    return new Angle(a.degrees - b.degrees);
+    return new Angle({ degrees: a.degrees - b.degrees });
   }
 
   #degrees = 0;
-  constructor(degrees = 0) {
-    this.degrees = degrees;
+  constructor({ degrees = null, radians = null } = {}) {
+    if (!(degrees && radians)) {
+      this.degrees = 0;
+    }
+    if (degrees) this.degrees = degrees;
+    if (radians) this.radians = radians;
   }
   get degrees() {
     return this.#degrees;
@@ -44,6 +48,12 @@ export class Angle {
   set degrees(newVal) {
     const val = newVal % 360;
     this.#degrees = val < 0 ? 360 + val : val;
+  }
+  get radians() {
+    return (this.#degrees * Math.PI) / 180;
+  }
+  set radians(newVal) {
+    this.degrees = (newVal * 180) / Math.PI;
   }
 }
 
@@ -172,7 +182,21 @@ export class Renderer extends Component {
   }
 
   _draw() {}
-  _rotate() {}
+  _rotate() {
+    const { position, rotation } = this.renderTransform;
+
+    Core.ctx.translate(position.x, position.y);
+    Core.ctx.rotate(rotation.radians);
+    Core.ctx.translate(-position.x, -position.y);
+
+    Core.ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+    const cw = Core.canvas.width / 2;
+    const ch = Core.canvas.height / 2;
+    Core.ctx.translate(cw, ch);
+    Core.ctx.rotate(Camera.current.rotation.radians);
+    Core.ctx.translate(-cw, -ch);
+  }
   update() {
     super.update();
 
