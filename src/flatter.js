@@ -7,6 +7,22 @@ export class Vector {
     return new Vector(1, 1);
   }
 
+  static get right() {
+    return new Vector(1, 0);
+  }
+
+  static get left() {
+    return new Vector(-1, 0);
+  }
+
+  static get up() {
+    return new Vector(0, -1);
+  }
+
+  static get down() {
+    return new Vector(0, 1);
+  }
+
   static Add(v, w) {
     return new Vector(v.x + w.x, v.y + w.y);
   }
@@ -19,9 +35,52 @@ export class Vector {
     return new Vector(vector.x * scalar, vector.y * scalar);
   }
 
+  static Distance(v, w) {
+    return Vector.Sub(v, w).magnitude;
+  }
+
+  static Lerp(v, w, t) {
+    return Vector.Add(v, Vector.Mul(Vector.Sub(w, v), t));
+  }
+
   constructor(x = 0, y = 0) {
     this.x = x;
     this.y = y;
+  }
+
+  get magnitude() {
+    return (this.x ** 2 + this.y ** 2) ** 0.5;
+  }
+
+  get normalized() {
+    return Vector.Mul(this, 1 / this.magnitude);
+  }
+
+  add(v) {
+    this.x += v.x;
+    this.y += v.y;
+    return this;
+  }
+
+  sub(v) {
+    this.x -= v.x;
+    this.y -= v.y;
+    return this;
+  }
+
+  mul(scalar) {
+    this.x *= scalar;
+    this.y *= scalar;
+    return this;
+  }
+
+  normalize() {
+    this.x /= this.magnitude;
+    this.y /= this.magnitude;
+  }
+
+  copy() {
+    return new Vector(this.x, this.y);
   }
 }
 
@@ -54,6 +113,20 @@ export class Angle {
   }
   set radians(newVal) {
     this.degrees = (newVal * 180) / Math.PI;
+  }
+
+  add(a) {
+    this.degrees += a.degrees;
+    return this;
+  }
+
+  sub(a) {
+    this.degrees -= a.degrees;
+    return this;
+  }
+
+  copy() {
+    return new Angle({ degrees: this.degrees });
   }
 }
 
@@ -156,13 +229,13 @@ export class Renderer extends Component {
   get renderTransform() {
     let root = this.gameObject;
 
-    let position = this.transform.position;
-    let rotation = this.transform.rotation;
-    let scale = this.transform.scale;
+    let position = this.transform.position.copy();
+    let rotation = this.transform.rotation.copy();
+    let scale = this.transform.scale.copy();
 
     while (root != null) {
-      position = Vector.Add(position, root.transform.position);
-      rotation = Angle.Add(rotation, root.transform.rotation);
+      position.add(root.transform.position);
+      rotation.add(root.transform.rotation);
       scale = new Vector(
         scale.x * root.transform.scale.x,
         scale.y * root.transform.scale.y
@@ -171,12 +244,9 @@ export class Renderer extends Component {
       root = root.parent;
     }
 
-    position = Vector.Sub(position, Camera.current.position);
-    position = Vector.Add(
-      position,
-      new Vector(Core.canvas.width / 2, Core.canvas.height / 2)
-    );
-    scale = Vector.Mul(scale, Camera.current.distance);
+    position.sub(Camera.current.position);
+    position.add(new Vector(Core.canvas.width / 2, Core.canvas.height / 2));
+    scale.mul(scale, Camera.current.distance);
 
     return new Transform({ position, rotation, scale });
   }
@@ -404,7 +474,7 @@ export class GameObject extends SceneObject {
 }
 
 export const Core = {
-  init(width = innerWidth, height = innerHeight) {
+  init(width = innerWidth - 20, height = innerHeight - 20) {
     this.canvas = document.querySelector("canvas");
     if (!this.canvas) {
       this.canvas = document.createElement("canvas");
@@ -415,16 +485,19 @@ export const Core = {
     this.canvas.height = height;
     this.ctx = this.canvas.getContext("2d");
 
-    let mainCam = new Camera({ name: "MainCam" });
+    new Camera({ name: "MainCam" });
     this.TICK = 0;
 
     this.animate();
   },
   animate() {
+    Core.ctx.clearRect(0, 0, Core.canvas.width, Core.canvas.height);
     requestAnimationFrame(() => {
       this.animate();
     });
+    this.update();
     RootObject.Update();
     this.TICK++;
   },
+  update() {},
 };
