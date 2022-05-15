@@ -141,26 +141,12 @@ export class RootObject {
   constructor({ name = "", isActive = true } = {}) {
     this.name = name;
     this.isActive = isActive;
+    this.updateFunc = null;
     RootObject.#rootObjectList.push(this);
   }
 
-  update() {}
-}
-
-export class Camera extends RootObject {
-  static current = null;
-  constructor({
-    position = Vector.zero,
-    rotation = new Angle(),
-    distance = 1,
-    ...args
-  } = {}) {
-    super(args);
-    this.position = position;
-    this.rotation = rotation;
-    this.distance = distance;
-
-    if (!Camera.current) Camera.current = this;
+  update() {
+    this.updateFunc && this.updateFunc();
   }
 }
 
@@ -200,6 +186,19 @@ export class Module extends RootObject {
   }
 }
 
+export class MovementController extends Module {
+  constructor({ vel = Vector.zero, acc = Vector.zero, ...args }) {
+    super(args);
+    this.vel = vel;
+    this.acc = acc;
+  }
+
+  update() {
+    this.vel.add(this.acc);
+    this.gameObject.transform.position.add(this.vel);
+  }
+}
+
 export class Transform extends Module {
   constructor({
     position = Vector.zero,
@@ -218,6 +217,14 @@ export class Component extends SceneObject {
   constructor({ gameObject = null, ...args } = {}) {
     super(args);
     this.gameObject = gameObject;
+  }
+}
+
+export class Camera extends Component {
+  static current = null;
+  constructor(args = {}) {
+    super(args);
+    if (!Camera.current) Camera.current = this;
   }
 }
 
@@ -244,9 +251,9 @@ export class Renderer extends Component {
       root = root.parent;
     }
 
-    position.sub(Camera.current.position);
+    position.sub(Camera.current.transform.position);
     position.add(new Vector(Core.canvas.width / 2, Core.canvas.height / 2));
-    scale.mul(scale, Camera.current.distance);
+    scale.mul(scale, Camera.current.transform.scale.x);
 
     return new Transform({ position, rotation, scale });
   }
@@ -264,7 +271,7 @@ export class Renderer extends Component {
     const cw = Core.canvas.width / 2;
     const ch = Core.canvas.height / 2;
     Core.ctx.translate(cw, ch);
-    Core.ctx.rotate(Camera.current.rotation.radians);
+    Core.ctx.rotate(Camera.current.transform.rotation.radians);
     Core.ctx.translate(-cw, -ch);
   }
   update() {
@@ -469,8 +476,6 @@ export class GameObject extends SceneObject {
     this.#componentList.push(component);
     component.gameObject = this;
   }
-
-  update() {}
 }
 
 export const Core = {
@@ -485,7 +490,10 @@ export const Core = {
     this.canvas.height = height;
     this.ctx = this.canvas.getContext("2d");
 
-    new Camera({ name: "MainCam" });
+    let camObj = new GameObject({ name: "MainCamObj" });
+    let cam = new Camera({ name: "MainCam" });
+    camObj.attach(cam);
+
     this.TICK = 0;
 
     this.animate();
